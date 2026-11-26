@@ -1,0 +1,202 @@
+
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#090e1b">
+<title>FITTRACK</title>
+<link rel="manifest" href="manifest.json">
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#090e1b;color:#eef4ff;font-family:Arial,sans-serif;padding:20px}
+main{max-width:650px;margin:auto}
+header{display:flex;justify-content:space-between;align-items:center}
+h1{font-size:28px;margin-bottom:4px}
+.muted{color:#8998b3;font-size:13px}
+.panel{background:#131d30;border:1px solid #26344d;border-radius:17px;padding:17px;margin:15px 0}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.big{font-size:27px;font-weight:bold;margin-top:8px}
+button,select{background:#1d65e8;color:white;border:0;padding:12px;border-radius:10px;font-weight:bold;cursor:pointer}
+button.secondary{background:#25334c}
+button:focus-visible{outline:2px solid white;outline-offset:3px}
+.tabs{display:flex;gap:7px;margin:18px 0}
+.tabs button{flex:1}
+section[hidden]{display:none}
+.bar{height:8px;background:#28364d;border-radius:10px;overflow:hidden;margin:12px 0}
+.fill{height:100%;background:#398bff;width:0}
+.exercise{padding:13px 0;border-bottom:1px solid #29364d}
+.exercise label{display:flex;gap:10px;align-items:flex-start}
+.exercise input{width:19px;height:19px;accent-color:#398bff}
+small{color:#91a1bd}
+</style>
+</head>
+<body>
+<main>
+<header>
+ <div><h1>⚡ FITTRACK</h1><div class="muted">YOUR FITNESS HUB</div></div>
+ <div>LEVEL <strong id="level">1</strong></div>
+</header>
+
+<div class="panel">
+ <div class="muted">GESAMT-ERFAHRUNG</div>
+ <div class="big"><span id="xp">0</span> XP</div>
+ <div class="bar"><div class="fill" id="xpbar"></div></div>
+ <small id="next">100 XP bis zum nächsten Level</small>
+</div>
+
+<div class="stats">
+ <div class="panel">
+  💧 <div class="muted">WASSER HEUTE</div>
+  <div class="big" id="water">0</div>
+  <button onclick="changeWater(1)">+ Glas</button>
+  <button class="secondary" onclick="changeWater(-1)">−</button>
+ </div>
+ <div class="panel">
+  🌙 <div class="muted">SCHLAF</div>
+  <div class="big"><span id="sleep">–</span> h</div>
+  <select id="sleepSelect" onchange="saveSleep()">
+   <option value="">Eintragen</option>
+   <option value="6">6 Stunden</option>
+   <option value="7">7 Stunden</option>
+   <option value="8">8 Stunden</option>
+   <option value="9">9 Stunden</option>
+   <option value="10">10 Stunden</option>
+   <option value="11">11 Stunden</option>
+  </select>
+ </div>
+</div>
+
+<div class="tabs">
+ <button onclick="showTab('home')">Übersicht</button>
+ <button onclick="showTab('training')">Training</button>
+ <button onclick="showTab('progress')">Fortschritt</button>
+</div>
+
+<section id="home">
+ <div class="panel">
+  <h3>Dein Trainingsziel</h3>
+  <p>2 Krafttrainings pro Woche</p>
+  <strong id="week">0 / 2</strong>
+  <div class="bar"><div class="fill" id="weekbar"></div></div>
+  <p class="muted">Erholung und dein zusätzlicher Sport zählen mit.</p>
+ </div>
+ <div class="panel">
+  <h3>Dein nächstes Workout</h3>
+  <button onclick="selectWorkout('A')">Workout A</button>
+  <button class="secondary" onclick="selectWorkout('B')">Workout B</button>
+ </div>
+</section>
+
+<section id="training" hidden>
+ <div class="panel">
+  <h2 id="workoutTitle">Workout A</h2>
+  <div id="exercises"></div>
+  <p class="muted">Starte mit zwei kontrollierten Sätzen. Pausiere ausreichend und höre bei Schmerzen auf.</p>
+  <button onclick="finishWorkout()">Training abschließen · +50 XP</button>
+  <p id="message" class="muted"></p>
+ </div>
+</section>
+
+<section id="progress" hidden>
+ <div class="panel">
+  <h2>Deine Statistiken</h2>
+  <p>Trainings insgesamt: <strong id="total">0</strong></p>
+  <p>XP: <strong id="totalXP">0</strong></p>
+  <h3>Trainingshistorie</h3>
+  <div id="history" class="muted">Noch keine Trainings.</div>
+  <button class="secondary" onclick="resetData()">Daten zurücksetzen</button>
+ </div>
+</section>
+</main>
+
+<script>
+const KEY="fittrack_v1";
+const plans={
+ A:[
+ ["Liegestütze","2 × 6–12"],
+ ["Kniebeugen","2 × 10–15"],
+ ["Pike Push-ups","2 × 5–8"],
+ ["W-Raises am Boden","2 × 8–12"],
+ ["Selbstwiderstands-Bizepscurls","2 × 8–12 je Arm"]
+ ],
+ B:[
+ ["Enge Liegestütze","2 × 5–10"],
+ ["Rückwärts-Ausfallschritte","2 × 8 je Bein"],
+ ["Glute Bridge","2 × 10–15"],
+ ["Reverse Snow Angels","2 × 8–12"],
+ ["Unterarmstütz","2 × 15–30 Sek."]
+ ]
+};
+let data={xp:0,water:{},sleep:{},history:[],selected:"A",checks:[]};
+try{data={...data,...JSON.parse(localStorage.getItem(KEY)||"{}")}}catch(e){}
+const today=()=>new Date().toLocaleDateString("en-CA");
+function save(){localStorage.setItem(KEY,JSON.stringify(data))}
+function changeWater(n){
+ const d=today();data.water[d]=Math.max(0,(data.water[d]||0)+n);
+ save();render();
+}
+function saveSleep(){
+ data.sleep[today()]=document.getElementById("sleepSelect").value;
+ save();render();
+}
+function showTab(id){
+ ["home","training","progress"].forEach(x=>{
+ document.getElementById(x).hidden=x!==id;
+ });
+}
+function selectWorkout(a){
+ data.selected=a;data.checks=[];save();renderPlan();showTab("training");
+}
+function renderPlan(){
+ const a=data.selected;
+ document.getElementById("workoutTitle").textContent="Workout "+a;
+ document.getElementById("exercises").innerHTML=plans[a].map((x,i)=>
+ `<div class="exercise"><label><input type="checkbox" data-index="${i}"><span><strong>${x[0]}</strong><br><small>${x[1]}</small></span></label></div>`
+ ).join("");
+ document.querySelectorAll("[data-index]").forEach(c=>{
+ c.checked=!!data.checks[Number(c.dataset.index)];
+ c.onchange=()=>{
+ data.checks[Number(c.dataset.index)]=c.checked;save();
+ };
+ });
+}
+function finishWorkout(){
+ if(!data.checks.some(Boolean)){
+ document.getElementById("message").textContent="Hake zuerst mindestens eine Übung ab.";
+ return;
+ }
+ data.history.push({name:"Workout "+data.selected,date:today()});
+ data.xp+=50;data.checks=[];save();render();renderPlan();
+ document.getElementById("message").textContent="Gespeichert! +50 XP";
+}
+function resetData(){
+ if(confirm("Alle gespeicherten Daten löschen?")){
+ localStorage.removeItem(KEY);location.reload();
+ }
+}
+function render(){
+ const xp=data.xp||0,level=Math.floor(xp/100)+1;
+ document.getElementById("xp").textContent=xp;
+ document.getElementById("level").textContent=level;
+ document.getElementById("xpbar").style.width=(xp%100)+"%";
+ document.getElementById("next").textContent=(100-xp%100)+" XP bis Level "+(level+1);
+ document.getElementById("water").textContent=data.water[today()]||0;
+ document.getElementById("sleep").textContent=data.sleep[today()]||"–";
+ document.getElementById("sleepSelect").value=data.sleep[today()]||"";
+ const monday=new Date();monday.setHours(0,0,0,0);
+ monday.setDate(monday.getDate()-(monday.getDay()+6)%7);
+ const count=data.history.filter(x=>new Date(x.date+"T12:00:00")>=monday).length;
+ document.getElementById("week").textContent=Math.min(count,2)+" / 2";
+ document.getElementById("weekbar").style.width=Math.min(count/2*100,100)+"%";
+ document.getElementById("total").textContent=data.history.length;
+ document.getElementById("totalXP").textContent=xp;
+ document.getElementById("history").innerHTML=data.history.slice().reverse().map(x=>x.name+" · "+x.date).join("<br>")||"Noch keine Trainings.";
+}
+render();renderPlan();
+if("serviceWorker" in navigator){
+ window.addEventListener("load",()=>navigator.serviceWorker.register("./service-worker.js").catch(()=>{}));
+}
+</script>
+</body>
+</html>
