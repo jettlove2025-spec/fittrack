@@ -1,0 +1,13 @@
+
+{
+  "name": "FITTRACK - Your Fitness Hub",
+  "short_name": "FITTRACK",
+  "description": "Dein persönliches Fitness-Dashboard",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#090e1b",
+  "theme_color": "#090e1b",
+  "icons": []
+}
